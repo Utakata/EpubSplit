@@ -40,14 +40,14 @@ PER_SECTION = 'per_section'
 PER_N_SECTIONS = 'per_n_sections'
 PER_N_SPLITS = 'per_n_splits'
 NEW_BOOK_PER_LIST = [PER_SECTION, PER_N_SECTIONS, PER_N_SPLITS]
-title_section = _("Title for each new book will be taken from the first included section in the Table of Contents above, which you can edit here first.")
+title_section = "新しい各本のタイトルは、上の目次で最初に含まれるセクションから取得されます（ここで編集可能）。"
 NEW_BOOK_PER = {
-    PER_SECTION:(_("New Book per Section"),
-                 _("Make a new book for <i>each</i> of the sections selected above.") + "<br>" + title_section),
-    PER_N_SECTIONS:(_("New Book per N Sections"),
-                    _("Make new books, each containing N sections from those selected above.") + "<br>" + title_section),
-    PER_N_SPLITS:(_("N New Books"),
-                  _("Make N new books by evenly dividing the sections selected above.") + "<br>" + title_section)
+    PER_SECTION:("セクションごとに新しい本",
+                 "上で選択した<i>各</i>セクションに対して新しい本を作成します。" + "<br>" + title_section),
+    PER_N_SECTIONS:("Nセクションごとに新しい本",
+                    "上で選択した中からN個のセクションを含む新しい本を作成します。" + "<br>" + title_section),
+    PER_N_SPLITS:("N冊の新しい本",
+                  "上で選択したセクションを均等に分割してN冊の新しい本を作成します。" + "<br>" + title_section)
     }
 
 # Set defaults used by all.  Library specific settings continue to
@@ -171,13 +171,13 @@ class ConfigWidget(QWidget):
         self.l.addWidget(tab_widget)
 
         self.basic_tab = BasicTab(self, plugin_action)
-        tab_widget.addTab(self.basic_tab, _('Basic'))
+        tab_widget.addTab(self.basic_tab, '基本')
 
         self.columns_tab = CustomColumnsTab(self, plugin_action)
-        tab_widget.addTab(self.columns_tab, _('Custom Columns'))
+        tab_widget.addTab(self.columns_tab, 'カスタム列')
 
         self.newbookper_tab = NewBookPerTab(self, plugin_action)
-        tab_widget.addTab(self.newbookper_tab, _('New Book Per'))
+        tab_widget.addTab(self.newbookper_tab, '分割設定')
 
     def save_settings(self):
         prefs['editmetadata'] = self.basic_tab.editmetadata.isChecked()
@@ -236,121 +236,121 @@ class BasicTab(QWidget):
         self.l = QVBoxLayout()
         self.setLayout(self.l)
 
-        self.editmetadata = QCheckBox(_('Edit Metadata for New Book(s)'),self)
-        self.editmetadata.setToolTip(_('Show Edit Metadata Dialog after creating each new book entry, but <i>before</i> EPUB is created.<br>Allows for downloading metadata and ensures EPUB has updated metadata.'))
+        self.editmetadata = QCheckBox('新しい本のメタデータを編集',self)
+        self.editmetadata.setToolTip('各新しい本のエントリを作成した後、EPUBを作成する<i>前に</i>メタデータ編集ダイアログを表示します。<br>メタデータをダウンロードでき、EPUBに最新のメタデータが含まれるようにします。')
         self.editmetadata.setChecked(prefs['editmetadata'])
         self.l.addWidget(self.editmetadata)
 
-        self.show_checkedalways = QCheckBox(_("Show 'Always Include' Checkboxes"),self)
-        self.show_checkedalways.setToolTip(_('If enabled, a checkbox will appear for each section.')+' '+
-                                           _('Checked sections will be included in <i>all</i> split books.<br>Default title will still be taken from the first <i>selected</i> section, and section order will remain as shown.'))
+        self.show_checkedalways = QCheckBox("'常に含める'チェックボックスを表示",self)
+        self.show_checkedalways.setToolTip('有効にすると、各セクションにチェックボックスが表示されます。'+' '+
+                                           'チェックされたセクションは<i>すべての</i>分割本に含まれます。<br>デフォルトのタイトルは最初の<i>選択された</i>セクションから取得され、セクションの順序はそのまま保持されます。')
         self.show_checkedalways.setChecked(prefs['show_checkedalways'])
         self.l.addWidget(self.show_checkedalways)
         self.l.addSpacing(5)
 
-        label = QLabel(_('When making a new Epub, the metadata from the source book will be copied or not as you choose below.'))
+        label = QLabel('新しいEpubを作成する際、元の本からのメタデータコピーについて以下で選択してください。')
         label.setWordWrap(True)
         self.l.addWidget(label)
 
-        self.copytoctitle = QCheckBox(_('Title from First Included TOC'),self)
-        self.copytoctitle.setToolTip(_('Copy Title from the the first Table of Contents entry included in the Split Epub.\nSupersedes Copy Title below.'))
+        self.copytoctitle = QCheckBox('最初に含まれる目次からタイトルを取得',self)
+        self.copytoctitle.setToolTip('分割Epubに含まれる最初の目次エントリからタイトルをコピーします。\n下の「タイトルをコピー」より優先されます。')
         self.copytoctitle.setChecked(prefs['copytoctitle'])
         self.l.addWidget(self.copytoctitle)
 
-        self.copytitle = QCheckBox(_('Copy Title'),self)
-        self.copytitle.setToolTip(_('Copy Title from the source Epub to the Split Epub.  Adds "Split" to the title.'))
+        self.copytitle = QCheckBox('タイトルをコピー',self)
+        self.copytitle.setToolTip('元のEpubから分割Epubへタイトルをコピーします。タイトルに "Split" が追加されます。')
         self.copytitle.setChecked(prefs['copytitle'])
         self.l.addWidget(self.copytitle)
 
-        self.copyauthors = QCheckBox(_('Copy Authors'),self)
-        self.copyauthors.setToolTip(_('Copy Authors from the source Epub to the Split Epub.'))
+        self.copyauthors = QCheckBox('著者をコピー',self)
+        self.copyauthors.setToolTip('元のEpubから分割Epubへ著者をコピーします。')
         self.copyauthors.setChecked(prefs['copyauthors'])
         self.l.addWidget(self.copyauthors)
 
-        self.copyseries = QCheckBox(_('Copy Series'),self)
-        self.copyseries.setToolTip(_('Copy Series from the source Epub to the Split Epub.'))
+        self.copyseries = QCheckBox('シリーズをコピー',self)
+        self.copyseries.setToolTip('元のEpubから分割Epubへシリーズをコピーします。')
         self.copyseries.setChecked(prefs['copyseries'])
         self.l.addWidget(self.copyseries)
 
-        self.copycover = QCheckBox(_('Copy Cover'),self)
-        self.copycover.setToolTip(_('Copy Cover from the source Epub to the Split Epub.'))
+        self.copycover = QCheckBox('表紙をコピー',self)
+        self.copycover.setToolTip('元のEpubから分割Epubへ表紙をコピーします。')
         self.copycover.setChecked(prefs['copycover'])
         self.l.addWidget(self.copycover)
 
-        self.copyrating = QCheckBox(_('Copy Rating'),self)
-        self.copyrating.setToolTip(_('Copy Rating from the source Epub to the Split Epub.'))
+        self.copyrating = QCheckBox('評価をコピー',self)
+        self.copyrating.setToolTip('元のEpubから分割Epubへ評価をコピーします。')
         self.copyrating.setChecked(prefs['copyrating'])
         self.l.addWidget(self.copyrating)
 
-        self.copytags = QCheckBox(_('Copy Tags'),self)
-        self.copytags.setToolTip(_('Copy Tags from the source Epub to the Split Epub.'))
+        self.copytags = QCheckBox('タグをコピー',self)
+        self.copytags.setToolTip('元のEpubから分割Epubへタグをコピーします。')
         self.copytags.setChecked(prefs['copytags'])
         self.l.addWidget(self.copytags)
 
-        self.copyidentifiers = QCheckBox(_('Copy Identifiers'),self)
-        self.copyidentifiers.setToolTip(_('Copy Identifiers from the source Epub to the Split Epub.'))
+        self.copyidentifiers = QCheckBox('識別子(ID)をコピー',self)
+        self.copyidentifiers.setToolTip('元のEpubから分割Epubへ識別子をコピーします。')
         self.copyidentifiers.setChecked(prefs['copyidentifiers'])
         self.l.addWidget(self.copyidentifiers)
 
-        self.copydate = QCheckBox(_('Copy Date'),self)
-        self.copydate.setToolTip(_('Copy Date from the source Epub to the Split Epub.'))
+        self.copydate = QCheckBox('日付をコピー',self)
+        self.copydate.setToolTip('元のEpubから分割Epubへ日付をコピーします。')
         self.copydate.setChecked(prefs['copydate'])
         self.l.addWidget(self.copydate)
 
-        self.copypubdate = QCheckBox(_('Copy Published Date'),self)
-        self.copypubdate.setToolTip(_('Copy Published Date from the source Epub to the Split Epub.'))
+        self.copypubdate = QCheckBox('出版日をコピー',self)
+        self.copypubdate.setToolTip('元のEpubから分割Epubへ出版日をコピーします。')
         self.copypubdate.setChecked(prefs['copypubdate'])
         self.l.addWidget(self.copypubdate)
 
-        self.copypublisher = QCheckBox(_('Copy Publisher'),self)
-        self.copypublisher.setToolTip(_('Copy Publisher from the source Epub to the Split Epub.'))
+        self.copypublisher = QCheckBox('出版社をコピー',self)
+        self.copypublisher.setToolTip('元のEpubから分割Epubへ出版社をコピーします。')
         self.copypublisher.setChecked(prefs['copypublisher'])
         self.l.addWidget(self.copypublisher)
 
-        self.copylanguages = QCheckBox(_('Copy Languages'),self)
-        self.copylanguages.setToolTip(_('Copy Languages from the source Epub to the Split Epub.'))
+        self.copylanguages = QCheckBox('言語をコピー',self)
+        self.copylanguages.setToolTip('元のEpubから分割Epubへ言語をコピーします。')
         self.copylanguages.setChecked(prefs['copylanguages'])
         self.l.addWidget(self.copylanguages)
 
-        self.copycommentstitle = QCheckBox(_('Copy Source Title to Comments'),self)
-        self.copycommentstitle.setToolTip(_('Copy Title from the source Epub to the Split Epub Comments.'))
+        self.copycommentstitle = QCheckBox('元のタイトルをコメントにコピー',self)
+        self.copycommentstitle.setToolTip('元のEpubのタイトルを分割Epubのコメントにコピーします。')
         self.copycommentstitle.setChecked(prefs['copycommentstitle'])
         self.l.addWidget(self.copycommentstitle)
 
-        self.copycommentscallink = QCheckBox(_('Link to Source book in Calibre in Comments'),self)
-        self.copycommentscallink.setToolTip(_('Include a Calibre link to the source Epub in the Split Epub Comments.'))
+        self.copycommentscallink = QCheckBox('Calibre内の元の本へのリンクをコメントに含める',self)
+        self.copycommentscallink.setToolTip('元のEpubへのCalibreリンクを分割Epubのコメントに含めます。')
         self.copycommentscallink.setChecked(prefs['copycommentscallink'])
         self.l.addWidget(self.copycommentscallink)
 
-        self.copycommentsidurl = QCheckBox(_('Link to Source URL Identifier in Comments'),self)
-        self.copycommentsidurl.setToolTip(_("Include a link to the source Epub's URL Identifier(if present) in the Split Epub Comments."))
+        self.copycommentsidurl = QCheckBox('元のURL識別子へのリンクをコメントに含める',self)
+        self.copycommentsidurl.setToolTip("元のEpubのURL識別子(存在する場合)へのリンクを分割Epubのコメントに含めます。")
         self.copycommentsidurl.setChecked(prefs['copycommentsidurl'])
         self.l.addWidget(self.copycommentsidurl)
 
-        self.copycomments = QCheckBox(_('Copy Comments'),self)
-        self.copycomments.setToolTip(_('Copy Comments from the source Epub to the Split Epub.  Adds "Split from:" to the comments.'))
+        self.copycomments = QCheckBox('コメントをコピー',self)
+        self.copycomments.setToolTip('元のEpubから分割Epubへコメントをコピーします。コメントに「分割元:」を追加します。')
         self.copycomments.setChecked(prefs['copycomments'])
         self.l.addWidget(self.copycomments)
 
         self.l.addSpacing(15)
 
-        label = QLabel(_("These controls aren't plugin settings as such, but convenience buttons for setting Keyboard shortcuts and getting all the EpubSplit confirmation dialogs back again."))
+        label = QLabel('これらのコントロールはプラグイン設定ではありませんが、キーボードショートカットの設定やすべてのEpubSplit確認ダイアログをリセットするための便利なボタンです。')
         label.setWordWrap(True)
         self.l.addWidget(label)
         self.l.addSpacing(5)
 
-        keyboard_shortcuts_button = QPushButton(_('Keyboard shortcuts...'), self)
-        keyboard_shortcuts_button.setToolTip(_('Edit the keyboard shortcuts associated with this plugin'))
+        keyboard_shortcuts_button = QPushButton('キーボードショートカット...', self)
+        keyboard_shortcuts_button.setToolTip('このプラグインに関連付けられたキーボードショートカットを編集します')
         keyboard_shortcuts_button.clicked.connect(parent_dialog.edit_shortcuts)
         self.l.addWidget(keyboard_shortcuts_button)
 
-        reset_confirmation_button = QPushButton(_('Reset disabled &confirmation dialogs'), self)
-        reset_confirmation_button.setToolTip(_('Reset all show me again dialogs for the EpubSplit plugin'))
+        reset_confirmation_button = QPushButton('無効化された確認ダイアログをリセット(&C)', self)
+        reset_confirmation_button.setToolTip('EpubSplitプラグインのすべての「再表示しない」ダイアログをリセットします')
         reset_confirmation_button.clicked.connect(self.reset_dialogs)
         self.l.addWidget(reset_confirmation_button)
 
-        view_prefs_button = QPushButton(_('View library preferences...'), self)
-        view_prefs_button.setToolTip(_('View data stored in the library database for this plugin'))
+        view_prefs_button = QPushButton('ライブラリ設定を表示...', self)
+        view_prefs_button.setToolTip('このプラグインのためにライブラリデータベースに保存されているデータを表示します')
         view_prefs_button.clicked.connect(self.view_prefs)
         self.l.addWidget(view_prefs_button)
 
@@ -363,8 +363,8 @@ class BasicTab(QWidget):
             if key.startswith('epubsplit_') and key.endswith('_again') \
                                                   and dynamic[key] is False:
                 dynamic[key] = True
-        info_dialog(self, _('Done'),
-                    _('Confirmation dialogs have all been reset'),
+        info_dialog(self, '完了',
+                    '確認ダイアログはすべてリセットされました',
                     show=True,
                     show_copy_button=False)
 
@@ -380,14 +380,14 @@ class CustomColumnsTab(QWidget):
         self.l = QVBoxLayout()
         self.setLayout(self.l)
 
-        label = QLabel(_("Save Source column:"))
-        label.setToolTip(_("If set, the column below will be populated with the template below to record the source of the split file."))
+        label = QLabel("ソース保存カラム:")
+        label.setToolTip("設定すると、分割ファイルのソースを記録するために、以下のテンプレートで下の列が埋められます。")
         label.setWordWrap(True)
         self.l.addWidget(label)
 
         horz = QHBoxLayout()
         self.sourcecol = QComboBox(self)
-        self.sourcecol.setToolTip(_("Choose a column to populate with template on split."))
+        self.sourcecol.setToolTip("分割時にテンプレートで埋める列を選択します。")
         self.sourcecol.addItem('','none')
         ## sort by visible Column Name (vs #name)
         for key, column in sorted(custom_columns.items(), key=lambda x: x[1]['name']):
@@ -397,7 +397,7 @@ class CustomColumnsTab(QWidget):
         horz.addWidget(self.sourcecol)
 
         self.sourcetemplate = QLineEdit(self)
-        self.sourcetemplate.setToolTip(_("Template from source book. Example: {title} by {authors}"))
+        self.sourcetemplate.setToolTip("元の本からのテンプレート。例: {title} by {authors}")
         # if 'sourcetemplate' in prefs:
         self.sourcetemplate.setText(prefs['sourcetemplate'])
         # else:
@@ -407,7 +407,7 @@ class CustomColumnsTab(QWidget):
         self.l.addLayout(horz)
         self.l.addSpacing(5)
 
-        label = QLabel(_("If you have custom columns defined, they will be listed below.  Choose if you would like these columns copied to new split books."))
+        label = QLabel("カスタム列が定義されている場合、以下にリストされます。これらの列を新しい分割された本にコピーするかどうかを選択してください。")
         label.setWordWrap(True)
         self.l.addWidget(label)
         self.l.addSpacing(5)
@@ -430,7 +430,7 @@ class CustomColumnsTab(QWidget):
                 # for (k,v) in six.iteritems(column):
                 #     print("column['%s'] => %s"%(k,v))
                 checkbox = QCheckBox('%s(%s)'%(column['name'],key))
-                checkbox.setToolTip(_("Copy this %s column to new split books...")%column['datatype'])
+                checkbox.setToolTip("この %s 列を新しい分割された本にコピー..."%column['datatype'])
                 checkbox.setChecked(key in prefs['custom_cols'] and prefs['custom_cols'][key])
                 self.custcol_checkboxes[key] = checkbox
                 self.sl.addWidget(checkbox)
@@ -447,10 +447,10 @@ class NewBookPerTab(QWidget):
         self.l = QVBoxLayout()
         self.setLayout(self.l)
 
-        label = QLabel(_('Only one automatic Multiple Split mode can be active a time.  Select which and configure settings below.')
-                       +'<p>'+_("The title for each new book will be taken from the first included section in the Table of Contents.")
-                       +'<p>'+_('Sections that do not have a Table of Contents entry will be included in the previous section.')
-                       +'<p>'+_('You may edit the Table of Contents entries before splitting.'))
+        label = QLabel('一度にアクティブにできる自動複数分割モードは1つだけです。以下で選択し、設定を行ってください。'
+                       +'<p>'+'新しい各本のタイトルは、目次の最初に含まれるセクションから取得されます。'
+                       +'<p>'+'目次エントリのないセクションは、前のセクションに含まれます。'
+                       +'<p>'+'分割前に目次エントリを編集できます。')
         label.setWordWrap(True)
         self.l.addWidget(label)
 
@@ -496,22 +496,22 @@ class NewBookPerTab(QWidget):
             indent_list = []
             if n == PER_SECTION:
                 self.per_section = rb
-                l1 = QLabel(_('Create a new book for each selected section.'))
+                l1 = QLabel('選択した各セクションに対して新しい本を作成します。')
                 l1.setWordWrap(True)
                 indent_list = [l1]
             elif n == PER_N_SECTIONS:
                 self.per_n_sections = rb
-                l1 = QLabel(_('Create new books every N selected sections.'))
+                l1 = QLabel('選択したN個のセクションごとに新しい本を作成します。')
                 l1.setWordWrap(True)
                 (n_sections_layout,
-                 self.n_sections_num) = label_num_input(_('Number of Sections'),
-                                                       _('Sections per new book'),
+                 self.n_sections_num) = label_num_input('セクション数',
+                                                       '新しい本あたりのセクション数',
                                                         minimum=2)
-                l2 = QLabel(_('If the last book would contain fewer than sections than the Orphan Limit, include them in the previous book instead.  Last book will have more than N sections when that happens.'))
+                l2 = QLabel('最後の本に含まれるセクション数が孤立制限よりも少ない場合、それらを前の本に含めます。その場合、最後の本はN個を超えるセクションを持ちます。')
                 l2.setWordWrap(True)
                 (orphans_layout,
-                 self.orphans_num) = label_num_input(_('Orphan Limit'),
-                                                       _('Limit for orphan sections'))
+                 self.orphans_num) = label_num_input('孤立制限',
+                                                       '孤立セクションの制限')
                 indent_list = [l1,
                                n_sections_layout,
                                orphans_layout,
@@ -520,12 +520,12 @@ class NewBookPerTab(QWidget):
                 self.orphans_num.setText(prefs['orphans_num'])
             elif n == PER_N_SPLITS:
                 self.per_n_splits = rb
-                l1 = QLabel(_('Create N new books, dividing the selected sections between them as evenly as possible.')
-                            +'<p>'+_("Note that 'evenly' means the number of sections with entries in the Table of Contents, not files or size by bytes or words."))
+                l1 = QLabel('選択したセクションをできるだけ均等に分割してN冊の新しい本を作成します。'
+                            +'<p>'+'「均等」とは、ファイルやバイトサイズ、単語数ではなく、目次にエントリがあるセクションの数を意味することに注意してください。')
                 l1.setWordWrap(True)
                 (n_splits_layout,
-                 self.n_splits_num) = label_num_input(_('Number of books'),
-                                                       _('Split all selected sections into this many new books, dividing the sections evenly between them.'),
+                 self.n_splits_num) = label_num_input('本の数',
+                                                       '選択したすべてのセクションをこの数の新しい本に分割し、セクションを均等に分けます。',
                                                       minimum=2)
                 indent_list = [l1,n_splits_layout]
                 self.n_splits_num.setText(prefs['n_splits_num'])

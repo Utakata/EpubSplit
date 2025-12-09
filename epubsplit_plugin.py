@@ -10,7 +10,7 @@ __docformat__ = 'restructuredtext en'
 import logging
 logger = logging.getLogger(__name__)
 
-import time, os, copy, threading, math
+import time, os, copy, threading, math, sys
 from io import BytesIO
 from functools import partial
 from datetime import datetime
@@ -64,8 +64,8 @@ class EpubSplitPlugin(InterfaceAction):
     # keyboard shortcuts, so try to use an unusual/unused shortcut.
     # (text, icon_path, tooltip, keyboard shortcut)
     # icon_path isn't in the zip--icon loaded below.
-    action_spec = (_('EpubSplit'), None,
-                   _('Split off part of an EPUB into a new book.'), ())
+    action_spec = ('EpubSplit', None,
+                   'EPUBの一部を新しい本として分割します。', ())
     # None for keyboard shortcut doesn't allow shortcut.  () does, there just isn't one yet
 
     action_type = 'global'
@@ -111,8 +111,8 @@ class EpubSplitPlugin(InterfaceAction):
 
         if len(self.gui.library_view.get_selected_ids()) != 1:
             d = error_dialog(self.gui,
-                             _('Select One Book'),
-                             _('Please select exactly one book to split.'),
+                             '本を1つ選択',
+                             '分割する本を1つだけ選択してください。',
                              show_copy_button=False)
             d.exec_()
         else:
@@ -130,16 +130,10 @@ class EpubSplitPlugin(InterfaceAction):
 
                 if db.has_format(source_id,'EPUB',index_is_id=True):
                     splitepub = SplitEpub(BytesIO(db.format(source_id,'EPUB',index_is_id=True)))
-                    from calibre.ebooks.oeb.polish.container import get_container
-                    container = get_container(db.format_abspath(source_id,'EPUB',index_is_id=True))
-                    if container.opf_version_parsed.major >= 3:
-                        d = error_dialog(self.gui, _('EPUB3 Detected'),
-                                         _('This plugin only works on EPUB2 format ebooks.'))
-                        d.exec_()
-                        return
+                    # EPUB3 Check removed as per requirement
                 else:
-                    d = error_dialog(self.gui, _('No EPUB'),
-                                     _('This plugin only works on EPUB format ebooks.'))
+                    d = error_dialog(self.gui, 'EPUBがありません',
+                                     'このプラグインはEPUB形式の電子書籍でのみ動作します。')
                     d.exec_()
                     return
 
@@ -150,14 +144,15 @@ class EpubSplitPlugin(InterfaceAction):
             # logger.debug()
 
             d = SelectLinesDialog(self.gui,
-                                  _('Select Sections to Split Off'),
+                                  '分割するセクションを選択',
                                   prefs,
                                   self.qaction.icon(),
                                   lines,
                                   partial(self._do_split, db, source_id, misource, splitepub, lines),
                                   partial(self._do_splits, db, source_id, misource, splitepub, lines),
                                   partial(self._get_split_size, splitepub),
-                                  partial(self.interface_action_base_plugin.do_user_config,parent=self.gui)
+                                  partial(self.interface_action_base_plugin.do_user_config,parent=self.gui),
+                                  partial(self._do_export_split, splitepub, misource)
                                   )
             d.exec_()
 
@@ -165,6 +160,101 @@ class EpubSplitPlugin(InterfaceAction):
 
             if d.result() != d.Accepted:
                 return
+
+    def _do_export_split(self, splitepub, misource, level, output_formats, output_dir):
+        import subprocess
+        import shutil
+        from calibre.utils.icu import numeric_sort_key
+
+        splits = splitepub.get_split_lines_by_level(level)
+
+        if not splits:
+            info_dialog(self.gui, 'エクスポート', '指定されたレベルで分割可能なセクションが見つかりませんでした。', show=True).exec_()
+            return
+
+        QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
+        try:
+            self.gui.status_bar.show_message('エクスポート中...', 60000)
+
+            count = 0
+            total = len(splits)
+
+            for linenums, title in splits:
+                count += 1
+                safe_title = "".join([c for c in title if c.isalpha() or c.isdigit() or c==' ']).rstrip()
+                if not safe_title:
+                    safe_title = "part_%03d" % count
+
+                # Create temp epub
+                temp_epub = PersistentTemporaryFile(suffix='.epub')
+
+                # Filter linenums to ensure they are unique and sorted
+                linenums = list(set(linenums))
+                linenums.sort()
+
+                splitepub.write_split_epub(temp_epub,
+                                           linenums,
+                                           titleopt=title,
+                                           authoropts=misource.authors)
+
+                base_filename = "%03d_%s" % (count, safe_title)
+                base_path = os.path.join(output_dir, base_filename)
+
+                if 'epub' in output_formats:
+                    shutil.copy(temp_epub.name, base_path + ".epub")
+
+                # Convert if needed
+                if 'pdf' in output_formats or 'md' in output_formats:
+                    # We need to run ebook-convert
+                    # Assuming ebook-convert is in the path or same dir as python executable
+                    # In calibre environment, sys.executable points to calibre-debug or python
+                    # but ebook-convert is usually alongside it.
+
+                    # Try to find ebook-convert
+                    ebook_convert_cmd = 'ebook-convert'
+                    if sys.platform == 'win32':
+                        ebook_convert_cmd = 'ebook-convert.exe'
+
+                    # Check relative to current executable
+                    exe_dir = os.path.dirname(sys.executable)
+                    candidate = os.path.join(exe_dir, ebook_convert_cmd)
+                    if os.path.exists(candidate):
+                        ebook_convert_cmd = candidate
+
+                    if 'pdf' in output_formats:
+                        cmd = [ebook_convert_cmd, temp_epub.name, base_path + ".pdf"]
+                        # Run convert
+                        try:
+                            # Using subprocess to call conversion
+                            # We prevent window creation on windows
+                            startupinfo = None
+                            if sys.platform == 'win32':
+                                startupinfo = subprocess.STARTUPINFO()
+                                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+                            subprocess.check_call(cmd, startupinfo=startupinfo)
+                        except Exception as e:
+                            logger.error("Failed to convert to PDF: %s" % e)
+
+                    if 'md' in output_formats:
+                        cmd = [ebook_convert_cmd, temp_epub.name, base_path + ".md"]
+                        try:
+                            startupinfo = None
+                            if sys.platform == 'win32':
+                                startupinfo = subprocess.STARTUPINFO()
+                                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                            subprocess.check_call(cmd, startupinfo=startupinfo)
+                        except Exception as e:
+                            logger.error("Failed to convert to Markdown: %s" % e)
+
+            info_dialog(self.gui, '完了', 'エクスポートが完了しました。\n出力先: %s' % output_dir, show=True).exec_()
+
+        except Exception as e:
+            import traceback
+            error_dialog(self.gui, 'エラー', 'エクスポート中にエラーが発生しました:\n' + str(e), det_msg=traceback.format_exc(), show=True).exec_()
+        finally:
+            self.gui.status_bar.show_message('完了', 3000)
+            QApplication.restoreOverrideCursor()
 
     def has_lines(self,linenums):
         if len(linenums) < 1:
