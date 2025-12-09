@@ -16,13 +16,15 @@ from six.moves import range
 import logging
 logger = logging.getLogger(__name__)
 
+import os
 from datetime import datetime
 
 from PyQt5 import QtWidgets as QtGui
 from PyQt5 import QtCore
 from PyQt5.Qt import (QTableWidget, QVBoxLayout, QHBoxLayout, QProgressDialog, QTimer,
                       QDialogButtonBox, Qt, QAbstractItemView, QTableWidgetItem, QTextBrowser,
-                      QMenu, QLabel, QLineEdit, QApplication, QColor, QComboBox)
+                      QMenu, QLabel, QLineEdit, QApplication, QColor, QComboBox, QSpinBox,
+                      QCheckBox, QFileDialog, QGroupBox)
 
 from calibre.gui2 import error_dialog, warning_dialog, question_dialog, info_dialog
 from calibre.gui2.dialogs.confirm_delete import confirm
@@ -44,7 +46,7 @@ from calibre_plugins.epubsplit.common_utils \
 from calibre_plugins.epubsplit.config \
     import (NEW_BOOK_PER, PER_SECTION, PER_N_SECTIONS, PER_N_SPLITS )
 
-SAMPLE_NOTE=_("<p><b><i>Double click to copy from sample.</i></b></p>")
+SAMPLE_NOTE="<p><b><i>ダブルクリックしてサンプルからコピー。</i></b></p>"
 
 class SelectLinesDialog(SizePersistedDialog):
     def __init__(self, gui, header, prefs, icon, lines,
@@ -52,6 +54,7 @@ class SelectLinesDialog(SizePersistedDialog):
                  do_splits_fn,
                  get_split_size_fn,
                  do_user_config,
+                 do_export_split_fn,
                  save_size_name='epubsplit:update list dialog'):
         SizePersistedDialog.__init__(self, gui, save_size_name)
         self.gui = gui
@@ -59,6 +62,7 @@ class SelectLinesDialog(SizePersistedDialog):
         self.do_splits_fn = do_splits_fn
         self.get_split_size_fn = get_split_size_fn
         self.do_user_config = do_user_config
+        self.do_export_split_fn = do_export_split_fn
         self.prefs = prefs
         self.keys=dict()
 
@@ -78,12 +82,12 @@ class SelectLinesDialog(SizePersistedDialog):
 
         find_layout = QHBoxLayout()
 
-        findtooltip=_('Search for string in Table of Contents Entries.')
-        label = QLabel(_('Find:'))
+        findtooltip='目次エントリ内の文字列を検索します。'
+        label = QLabel('検索:')
         label.setToolTip(findtooltip)
 
         # Button to find the document for something
-        self.findButton = QtGui.QPushButton(_('Find'),self)
+        self.findButton = QtGui.QPushButton('検索',self)
         self.findButton.clicked.connect(self.find)
         self.findButton.setToolTip(findtooltip)
 
@@ -94,12 +98,12 @@ class SelectLinesDialog(SizePersistedDialog):
 
         # Find type
         self.findtype = QComboBox(self)
-        self.findtype.setToolTip(_('Choose how found entries will be treated.'))
+        self.findtype.setToolTip('見つかったエントリの処理方法を選択します。')
         self.populate_findtype()
 
         # Case Sensitivity option
-        self.caseSens = QtGui.QCheckBox(_('Case sensitive'),self)
-        self.caseSens.setToolTip(_("Search for case sensitive string; don't treat Harry, HARRY and harry all the same."))
+        self.caseSens = QtGui.QCheckBox('大文字小文字を区別',self)
+        self.caseSens.setToolTip("大文字と小文字を区別して検索します。Harry、HARRY、harryをすべて同じものとして扱いません。")
 
         find_layout.addWidget(label)
         find_layout.addWidget(self.findField)
@@ -115,27 +119,33 @@ class SelectLinesDialog(SizePersistedDialog):
         options_layout = QHBoxLayout()
 
         # Button to search the document for something
-        config_button = QtGui.QPushButton(_('Configure'),self)
+        config_button = QtGui.QPushButton('設定',self)
         config_button.clicked.connect(self.user_config)
-        config_button.setToolTip(_('Configure Plugin'))
+        config_button.setToolTip('プラグインを設定')
         options_layout.addWidget(config_button)
 
+        # Export button
+        export_button = QtGui.QPushButton('エクスポート...', self)
+        export_button.clicked.connect(self.show_export_dialog)
+        export_button.setToolTip('指定した階層レベルで分割してファイルにエクスポートします。')
+        options_layout.addWidget(export_button)
+
         button_box = QDialogButtonBox(self)
-        new_book = button_box.addButton(_("New Book"), button_box.ActionRole)
-        new_book.setToolTip(_("Make <i>one</i> new book containing the sections selected above and then edit its Metadata."))
+        new_book = button_box.addButton("新しい本を作成", button_box.ActionRole)
+        new_book.setToolTip("上で選択したセクションを含む新しい本を<i>1冊</i>作成し、そのメタデータを編集します。")
         new_book.clicked.connect(self.new_book)
 
-        self.new_books_b = button_box.addButton(_("New Book per Section"), button_box.ActionRole)
+        self.new_books_b = button_box.addButton("セクションごとに新しい本", button_box.ActionRole)
         (txt,tooltip) = NEW_BOOK_PER[self.prefs['new_book_per']]
         self.new_books_b.setText(txt)
         self.new_books_b.setToolTip(tooltip)
         self.new_books_b.clicked.connect(self.new_books)
 
-        get_split_size = button_box.addButton(_("Get Size"), button_box.ActionRole)
-        get_split_size.setToolTip("<i></i>" + _("Calculate the size of the new book from the currently selected sections."))
+        get_split_size = button_box.addButton("サイズを取得", button_box.ActionRole)
+        get_split_size.setToolTip("<i></i>" + "現在選択されているセクションから新しい本のサイズを計算します。")
         get_split_size.clicked.connect(self.get_split_size)
 
-        button_box.addButton(_("Done"), button_box.RejectRole)
+        button_box.addButton("完了", button_box.RejectRole)
         button_box.rejected.connect(self.reject)
         options_layout.addWidget(button_box)
 
@@ -148,10 +158,10 @@ class SelectLinesDialog(SizePersistedDialog):
 
     def populate_findtype(self):
         self.findtype.clear()
-        self.findtype.addItem(_('Highlight'))
-        self.findtype.addItem(_('Select'))
+        self.findtype.addItem('ハイライト')
+        self.findtype.addItem('選択')
         if self.prefs['show_checkedalways']:
-            self.findtype.addItem(_('Check'))
+            self.findtype.addItem('チェック')
 
     def user_config(self):
         self.do_user_config()
@@ -224,22 +234,26 @@ class SelectLinesDialog(SizePersistedDialog):
             else:
                 checkstate = Qt.Unchecked
 
-            if self.findtype.currentText() == _('Check'):
+            if self.findtype.currentText() == 'チェック':
                 # checkbox
                 self.lines_table.item(row,0).setCheckState(checkstate)
 
-            if self.findtype.currentText() == _('Select'):
+            if self.findtype.currentText() == '選択':
                 # select - need to select each cell in row.
                 for col in range(self.lines_table.columnCount()):
                     self.lines_table.item(row,col).setSelected(found)
 
-            if self.findtype.currentText() == _('Highlight'): # Highlight
+            if self.findtype.currentText() == 'ハイライト': # Highlight
                 tocitem = self.lines_table.item(row,3)
                 if found:
                     tocitem.setBackground(highlightcolor)
                 else:
                     # copy unhighlighted background from href cell.
                     tocitem.setBackground(self.lines_table.item(row,1).background())
+
+    def show_export_dialog(self):
+        d = ExportDialog(self, self.do_export_split_fn)
+        d.exec_()
 
 class LinesTableWidget(QTableWidget):
 
@@ -251,7 +265,7 @@ class LinesTableWidget(QTableWidget):
         self.clear()
         self.setAlternatingRowColors(True)
         self.setRowCount(len(lines))
-        header_labels = ['', _('HREF'), _('Guide'), _('Table of Contents')] #, 'extra'
+        header_labels = ['', 'HREF', 'ガイド', '目次'] #, 'extra'
         self.setColumnCount(len(header_labels))
         self.setHorizontalHeaderLabels(header_labels)
         self.horizontalHeader().setStretchLastSection(True)
@@ -282,8 +296,8 @@ class LinesTableWidget(QTableWidget):
             checkbox_cell = QTableWidgetItem()
             checkbox_cell.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             checkbox_cell.setCheckState(Qt.Unchecked)
-            checkbox_cell.setToolTip(_('Checked sections will be included in <i>all</i> split books.<br>Default title will still be taken from the first <i>selected</i> section, and section order will remain as shown.')+
-                                     '<br>'+_('Use Context Menu (right-click) on selected sections to check or uncheck all selected sections.'))
+            checkbox_cell.setToolTip('チェックされたセクションは<i>すべての</i>分割本に含まれます。<br>デフォルトのタイトルは最初の<i>選択された</i>セクションから取得され、セクションの順序はそのまま保持されます。'+
+                                     '<br>'+'コンテキストメニュー（右クリック）を使用して、選択したセクションをすべてチェック/チェック解除します。')
             self.setItem(row, 0, checkbox_cell)
 
         href = line['href']
@@ -299,15 +313,15 @@ class LinesTableWidget(QTableWidget):
         else:
             guide = ""
         guide_cell = ReadOnlyTableWidgetItem(guide)
-        guide_cell.setToolTip(_("Indicates 'special' pages: copyright, titlepage, etc."))
+        guide_cell.setToolTip("著作権、タイトルページなどの「特別な」ページを示します。")
         self.setItem(row, 2, guide_cell)
 
         toc_str = "|".join(line['toc'])
         toc_cell = QTableWidgetItem(toc_str)
         toc_cell.setData(Qt.UserRole, toc_str)
-        toc_cell.setToolTip(_('''Click and copy hotkey to copy text.
-Double-click to edit ToC entry.
-Pipes(|) divide different ToC entries to the same place.'''))
+        toc_cell.setToolTip('''クリックしてホットキーをコピーしてテキストをコピーします。
+ダブルクリックしてToCエントリを編集します。
+パイプ(|)は同じ場所への異なるToCエントリを区切ります。''')
         self.setItem(row, 3, toc_cell)
 
     def get_row_linenum(self,row):
@@ -398,15 +412,15 @@ Pipes(|) divide different ToC entries to the same place.'''))
     def show_tooltip(self,modidx):
         "Show section sample from tooltip in an info for copying when double clicked."
         if modidx.column() == 1: # HREFs column only.
-            ViewSample(_("Section Sample"),
+            ViewSample("セクションサンプル",
                        self.item(modidx.row(),modidx.column()).toolTip().replace(SAMPLE_NOTE,''),
                        parent=self.parent()).exec_()
 
     def contextMenuEvent(self, event):
         if not self.isColumnHidden(0):
             menu = QMenu(self)
-            checkAction = menu.addAction(_("Check Selected"))
-            uncheckAction = menu.addAction(_("Uncheck Selected"))
+            checkAction = menu.addAction("選択項目をチェック")
+            uncheckAction = menu.addAction("選択項目のチェックを解除")
             action = menu.exec_(self.mapToGlobal(event.pos()))
             for row in self.get_selected_rows():
                 cb = self.item(self.get_row_linenum(row),0)
@@ -420,9 +434,9 @@ def LoopProgressDialog(gui,
                        split_list,
                        foreach_function,
                        finish_function,
-                       init_label=_("Splitting Sections..."),
-                       win_title=_("Splitting Sections..."),
-                       status_prefix=_("Splitting Sections...")):
+                       init_label="セクションを分割中...",
+                       win_title="セクションを分割中...",
+                       status_prefix="セクションを分割中..."):
     ld = _LoopProgressDialog(gui,
                              split_list,
                              foreach_function,
@@ -444,12 +458,12 @@ class _LoopProgressDialog(QProgressDialog):
     def __init__(self, gui,
                  split_list,
                  foreach_function,
-                 init_label=_("Splitting Sections..."),
-                 win_title=_("Splitting Sections..."),
-                 status_prefix=_("Splitting Sections...")):
+                 init_label="セクションを分割中...",
+                 win_title="セクションを分割中...",
+                 status_prefix="セクションを分割中..."):
         QProgressDialog.__init__(self,
                                  init_label,
-                                 _('Cancel'), 0, len(split_list), gui)
+                                 'キャンセル', 0, len(split_list), gui)
         self.setWindowTitle(win_title)
         self.setMinimumWidth(500)
         self.split_list = split_list
@@ -470,7 +484,7 @@ class _LoopProgressDialog(QProgressDialog):
         if self.i > -1:
             time_spent = (datetime.now() - self.start_time).total_seconds()
             estimated_remaining = (time_spent/(self.i+1)) * len(self.split_list) - time_spent
-            remaining_time_string = _(' - %s estimated until done') % ( time_duration_format(estimated_remaining))
+            remaining_time_string = ' - 完了まで推定 %s' % ( time_duration_format(estimated_remaining))
 
         self.setLabelText('%s %d / %d%s' % (self.status_prefix, self.i+1, len(self.split_list), remaining_time_string))
         self.setValue(self.i+1)
@@ -527,10 +541,10 @@ def time_duration_format(seconds):
     :return: string description of the duration
     """
     periods = [
-        (_('%d day'),_('%d days'),       60*60*24),
-        (_('%d hour'),_('%d hours'),     60*60),
-        (_('%d minute'),_('%d minutes'), 60),
-        (_('%d second'),_('%d seconds'), 1)
+        ('%d日','%d日',       60*60*24),
+        ('%d時間','%d時間',     60*60),
+        ('%d分','%d分', 60),
+        ('%d秒','%d秒', 1)
         ]
 
     strings = []
@@ -545,7 +559,91 @@ def time_duration_format(seconds):
                 break
 
     if len(strings) == 0:
-        return _('less than 1 second')
+        return '1秒未満'
     else:
         return ', '.join(strings)
 
+class ExportDialog(SizePersistedDialog):
+    def __init__(self, parent, do_export_fn):
+        SizePersistedDialog.__init__(self, parent, 'epubsplit:export dialog')
+        self.do_export_fn = do_export_fn
+
+        self.setWindowTitle('分割してエクスポート')
+        self.setWindowIcon(get_icon('images/icon.png'))
+
+        layout = QVBoxLayout(self)
+        self.setLayout(layout)
+
+        # Level selection
+        level_layout = QHBoxLayout()
+        level_label = QLabel("階層レベル:")
+        level_label.setToolTip("目次のどの深さまでを分割単位とするか指定します。\n1 = 章, 2 = 節, ...")
+        self.level_spin = QSpinBox()
+        self.level_spin.setRange(1, 10)
+        self.level_spin.setValue(1)
+        level_layout.addWidget(level_label)
+        level_layout.addWidget(self.level_spin)
+        layout.addLayout(level_layout)
+
+        # Format selection
+        format_group = QGroupBox("出力形式")
+        format_layout = QVBoxLayout()
+        self.fmt_epub = QCheckBox("EPUB")
+        self.fmt_pdf = QCheckBox("PDF")
+        self.fmt_md = QCheckBox("Markdown (.md)")
+
+        self.fmt_pdf.setChecked(True) # Default as per request
+        self.fmt_md.setChecked(True)
+
+        format_layout.addWidget(self.fmt_epub)
+        format_layout.addWidget(self.fmt_pdf)
+        format_layout.addWidget(self.fmt_md)
+        format_group.setLayout(format_layout)
+        layout.addWidget(format_group)
+
+        # Output directory
+        dir_layout = QHBoxLayout()
+        dir_label = QLabel("出力先:")
+        self.dir_edit = QLineEdit()
+        dir_btn = QtGui.QPushButton("参照...")
+        dir_btn.clicked.connect(self.choose_dir)
+
+        dir_layout.addWidget(dir_label)
+        dir_layout.addWidget(self.dir_edit)
+        dir_layout.addWidget(dir_btn)
+        layout.addLayout(dir_layout)
+
+        # Buttons
+        button_box = QDialogButtonBox(self)
+        export_btn = button_box.addButton("エクスポート", button_box.ActionRole)
+        export_btn.clicked.connect(self.accept)
+        cancel_btn = button_box.addButton("キャンセル", button_box.RejectRole)
+        cancel_btn.clicked.connect(self.reject)
+        layout.addWidget(button_box)
+
+        self.resize_dialog()
+
+    def choose_dir(self):
+        d = QFileDialog.getExistingDirectory(self, "出力先フォルダを選択")
+        if d:
+            self.dir_edit.setText(d)
+
+    def accept(self):
+        level = self.level_spin.value()
+        formats = []
+        if self.fmt_epub.isChecked(): formats.append('epub')
+        if self.fmt_pdf.isChecked(): formats.append('pdf')
+        if self.fmt_md.isChecked(): formats.append('md')
+
+        out_dir = self.dir_edit.text()
+
+        if not formats:
+            error_dialog(self, "形式未選択", "少なくとも1つの出力形式を選択してください。", show=True).exec_()
+            return
+
+        if not out_dir or not os.path.exists(out_dir):
+            error_dialog(self, "フォルダ不正", "有効な出力先フォルダを指定してください。", show=True).exec_()
+            return
+
+        self.do_export_fn(level, formats, out_dir)
+        super(ExportDialog, self).accept()

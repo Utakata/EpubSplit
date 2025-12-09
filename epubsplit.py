@@ -696,6 +696,128 @@ class SplitEpub:
             # print(self.toc_map)
         return self.toc_map
 
+    def get_toc_structure(self):
+        """
+        Returns a list of dicts representing the flattened TOC structure with hierarchy levels.
+        Each dict has: {'title': str, 'href': str, 'anchor': str, 'level': int}
+        """
+        toc_dom = self.get_toc_dom()
+        try:
+            nav_map = toc_dom.getElementsByTagName("navMap")[0]
+        except IndexError:
+            return []
+
+        result = []
+
+        def process_navpoint(element, current_level):
+            # Check if it is a navPoint
+            if element.tagName != 'navPoint':
+                return
+
+            # Get label text
+            try:
+                label_node = element.getElementsByTagName("navLabel")[0]
+                text_node = label_node.getElementsByTagName("text")[0]
+                title = text_node.firstChild.data if text_node.firstChild else ""
+            except IndexError:
+                title = ""
+
+            # Get content src
+            try:
+                content_node = element.getElementsByTagName("content")[0]
+                raw_src = content_node.getAttribute("src")
+                src = normpath(unquote(self.get_toc_relpath() + raw_src))
+
+                if '#' in src:
+                    href, anchor = src.split('#')
+                else:
+                    href, anchor = src, None
+            except IndexError:
+                href, anchor = None, None
+
+            if href:
+                result.append({
+                    'title': title,
+                    'href': href,
+                    'anchor': anchor,
+                    'level': current_level
+                })
+
+            # Process children (nested navPoints)
+            for child in element.childNodes:
+                if child.nodeType == 1 and child.tagName == 'navPoint': # Element node
+                    process_navpoint(child, current_level + 1)
+
+        for child in nav_map.childNodes:
+            if child.nodeType == 1 and child.tagName == 'navPoint':
+                process_navpoint(child, 1)
+
+        return result
+
+    def get_split_lines_by_level(self, level):
+        """
+        Returns a list of tuples (linenum_list, title) for splitting based on TOC level.
+        Only items up to `level` depth start a new split.
+        Items deeper than `level` are included in the parent split.
+        """
+        lines = self.get_split_lines()
+        toc_structure = self.get_toc_structure()
+
+        # Build a mapping from (href, anchor) to (level, title)
+        # We need to match split lines to TOC items.
+        # split_lines has 'href' and 'anchor'.
+
+        toc_lookup = {}
+        for item in toc_structure:
+            key = (item['href'], item['anchor'])
+            # If duplicates (e.g. multiple TOC pointing to same place), first one wins usually
+            if key not in toc_lookup:
+                toc_lookup[key] = item
+
+        splits_list = []
+        current_section_lines = []
+        current_title = self.origtitle + " Split"
+
+        for i, line in enumerate(lines):
+            href = line['href']
+            anchor = line['anchor']
+            key = (href, anchor)
+
+            is_start_of_new_section = False
+            new_section_title = None
+
+            if key in toc_lookup:
+                item = toc_lookup[key]
+                if item['level'] <= level:
+                    is_start_of_new_section = True
+                    new_section_title = item['title']
+
+            # If it's a file start (anchor is None) and we are not in a section yet, maybe start one?
+            # But the requirement is "split by hierarchy". If a file is part of a chapter, it should stay with it.
+            # Only explicit TOC points at level <= N should trigger split.
+            # However, if the very first line is not in TOC, we must start a section.
+
+            if i == 0 and not is_start_of_new_section:
+                is_start_of_new_section = True
+                # Try to find a title if possible, or use default
+                # If the first line corresponds to a TOC item > level, we might want to use that title but technically it belongs to "previous" (non-existent) or just start here.
+                if key in toc_lookup:
+                     current_title = toc_lookup[key]['title']
+
+            if is_start_of_new_section:
+                if current_section_lines:
+                    splits_list.append((current_section_lines, current_title))
+                current_section_lines = [i]
+                if new_section_title:
+                    current_title = new_section_title
+            else:
+                current_section_lines.append(i)
+
+        if current_section_lines:
+            splits_list.append((current_section_lines, current_title))
+
+        return splits_list
+
     # list of dicts with href, anchor & toc text.
     # 'split lines' are all the points that the epub can be split on.
     # Offer a split at each spine file and each ToC point.
@@ -706,7 +828,7 @@ class SplitEpub:
         try:
             self.origtitle = metadom.getElementsByTagName("dc:title")[0].firstChild.data
         except:
-            self.origtitle = "(Title Missing)"
+            self.origtitle = "(タイトル不明)"
 
         ## Save authors.
         for creator in metadom.getElementsByTagName("dc:creator"):
@@ -717,7 +839,7 @@ class SplitEpub:
             except:
                 pass
         if len(self.origauthors) == 0:
-            self.origauthors.append("(Authors Missing)")
+            self.origauthors.append("(著者不明)")
 
         self.split_lines = [] # list of dicts with href, anchor and toc
         # spin on spine files.
